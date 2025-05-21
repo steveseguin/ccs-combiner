@@ -11,103 +11,175 @@
       padding: 0;
     }
     
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --secondary: #e5e7eb;
+      --secondary-hover: #d1d5db;
+      --text: #1f2937;
+      --light-text: #6b7280;
+      --success: #10b981;
+      --success-bg: #ecfdf5;
+      --error: #ef4444;
+      --error-bg: #fef2f2;
+      --border: #e5e7eb;
+      --shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+      --radius: 8px;
+    }
+    
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
       line-height: 1.6;
-      padding: 20px;
+      padding: 24px;
       max-width: 1200px;
       margin: 0 auto;
-      color: #333;
+      color: var(--text);
+      background-color: #f9fafb;
     }
     
     h1 {
-      margin-bottom: 20px;
+      margin-bottom: 24px;
       text-align: center;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--primary);
     }
     
     .container {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px;
+      gap: 24px;
+      background-color: white;
+      padding: 32px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
     }
     
     .output-container {
       grid-column: 1 / -1;
+      margin-top: 8px;
     }
     
     textarea {
       width: 100%;
       min-height: 300px;
-      padding: 12px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-family: monospace;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: 'Courier New', Courier, monospace;
       line-height: 1.4;
       resize: vertical;
+      font-size: 14px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+      background-color: #f9fafb;
+    }
+    
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
     }
     
     label {
       display: block;
-      margin-bottom: 8px;
-      font-weight: bold;
+      margin-bottom: 10px;
+      font-weight: 600;
+      color: var(--text);
     }
     
     button {
-      padding: 10px 15px;
-      background-color: #4CAF50;
+      padding: 12px 20px;
+      background-color: var(--primary);
       color: white;
       border: none;
-      border-radius: 4px;
+      border-radius: var(--radius);
       cursor: pointer;
-      font-size: 16px;
-      margin-top: 10px;
-      transition: background-color 0.3s;
+      font-size: 15px;
+      font-weight: 600;
+      transition: all 0.2s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     
     button:hover {
-      background-color: #45a049;
+      background-color: var(--primary-hover);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
     
     .btn-container {
       display: flex;
       justify-content: space-between;
-      gap: 10px;
-      margin-top: 20px;
+      gap: 16px;
+      margin-top: 24px;
       grid-column: 1 / -1;
     }
     
+    .btn-group {
+      display: flex;
+      gap: 12px;
+    }
+    
     button.secondary {
-      background-color: #f1f1f1;
-      color: #333;
+      background-color: var(--secondary);
+      color: var(--text);
     }
     
     button.secondary:hover {
-      background-color: #e0e0e0;
+      background-color: var(--secondary-hover);
     }
     
     button.copy {
-      background-color: #2196F3;
+      background-color: var(--success);
     }
     
     button.copy:hover {
-      background-color: #0b7dda;
+      background-color: #0da271;
     }
     
     .message {
-      padding: 10px;
-      margin-top: 10px;
-      border-radius: 4px;
+      padding: 12px 16px;
+      margin-top: 16px;
+      border-radius: var(--radius);
       text-align: center;
+      font-weight: 500;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    
+    .message.visible {
+      opacity: 1;
+      transform: translateY(0);
     }
     
     .success {
-      background-color: #dff0d8;
-      color: #3c763d;
+      background-color: var(--success-bg);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.2);
     }
     
     .error {
-      background-color: #f2dede;
-      color: #a94442;
+      background-color: var(--error-bg);
+      color: var(--error);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    
+    @media (max-width: 768px) {
+      .container {
+        grid-template-columns: 1fr;
+        padding: 24px;
+      }
+      
+      .btn-container {
+        flex-direction: column;
+      }
+      
+      .btn-group {
+        width: 100%;
+      }
+      
+      button {
+        flex: 1;
+      }
     }
   </style>
 </head>
@@ -128,11 +200,11 @@
     <div class="output-container">
       <label for="result">Merged CSS:</label>
       <textarea id="result" readonly placeholder="Merged CSS will appear here..."></textarea>
-      <div id="message" class="message" style="display: none;"></div>
+      <div id="message" class="message"></div>
     </div>
     
     <div class="btn-container">
-      <div>
+      <div class="btn-group">
         <button id="merge-btn">Merge CSS</button>
         <button id="clear-btn" class="secondary">Clear All</button>
       </div>
@@ -462,14 +534,42 @@
       clearTimeout(messageTimeout);
       messageDiv.textContent = text;
       messageDiv.className = 'message ' + type;
-      messageDiv.style.display = 'block';
+      messageDiv.classList.add('visible');
       
       messageTimeout = setTimeout(hideMessage, 3000);
     }
 
     function hideMessage() {
-      messageDiv.style.display = 'none';
+      messageDiv.classList.remove('visible');
+      // Small delay to let the transition finish before hiding
+      setTimeout(() => {
+        if (!messageDiv.classList.contains('visible')) {
+          messageDiv.style.display = 'none';
+        }
+      }, 300);
     }
+
+    // Initialize message display style
+    messageDiv.style.display = 'none';
+
+    // Focus handlers for better UX
+    oldCssInput.addEventListener('focus', () => {
+      oldCssInput.parentElement.style.opacity = '1';
+      newCssInput.parentElement.style.opacity = '0.8';
+    });
+
+    newCssInput.addEventListener('focus', () => {
+      newCssInput.parentElement.style.opacity = '1';
+      oldCssInput.parentElement.style.opacity = '0.8';
+    });
+
+    // Reset opacity when losing focus
+    [oldCssInput, newCssInput].forEach(input => {
+      input.addEventListener('blur', () => {
+        oldCssInput.parentElement.style.opacity = '1';
+        newCssInput.parentElement.style.opacity = '1';
+      });
+    });
   });
   </script>
 </body>
