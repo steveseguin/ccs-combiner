@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSS Merger</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      color: #333;
+    }
+    
+    h1 {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    
+    .output-container {
+      grid-column: 1 / -1;
+    }
+    
+    textarea {
+      width: 100%;
+      min-height: 300px;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: monospace;
+      line-height: 1.4;
+      resize: vertical;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    
+    button {
+      padding: 10px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 10px;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background-color: #45a049;
+    }
+    
+    .btn-container {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 20px;
+      grid-column: 1 / -1;
+    }
+    
+    button.secondary {
+      background-color: #f1f1f1;
+      color: #333;
+    }
+    
+    button.secondary:hover {
+      background-color: #e0e0e0;
+    }
+    
+    button.copy {
+      background-color: #2196F3;
+    }
+    
+    button.copy:hover {
+      background-color: #0b7dda;
+    }
+    
+    .message {
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .success {
+      background-color: #dff0d8;
+      color: #3c763d;
+    }
+    
+    .error {
+      background-color: #f2dede;
+      color: #a94442;
+    }
+  </style>
+</head>
+<body>
+  <h1>CSS Merger</h1>
+  
+  <div class="container">
+    <div>
+      <label for="old-css">Old CSS:</label>
+      <textarea id="old-css" placeholder="Paste your old CSS here..."></textarea>
+    </div>
+    
+    <div>
+      <label for="new-css">New CSS:</label>
+      <textarea id="new-css" placeholder="Paste your new CSS here..."></textarea>
+    </div>
+    
+    <div class="output-container">
+      <label for="result">Merged CSS:</label>
+      <textarea id="result" readonly placeholder="Merged CSS will appear here..."></textarea>
+      <div id="message" class="message" style="display: none;"></div>
+    </div>
+    
+    <div class="btn-container">
+      <div>
+        <button id="merge-btn">Merge CSS</button>
+        <button id="clear-btn" class="secondary">Clear All</button>
+      </div>
+      <button id="copy-btn" class="copy">Copy Result</button>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const oldCssInput = document.getElementById('old-css');
+      const newCssInput = document.getElementById('new-css');
+      const resultOutput = document.getElementById('result');
+      const mergeBtn = document.getElementById('merge-btn');
+      const clearBtn = document.getElementById('clear-btn');
+      const copyBtn = document.getElementById('copy-btn');
+      const messageDiv = document.getElementById('message');
+      
+      // Load from localStorage if available
+      oldCssInput.value = localStorage.getItem('oldCss') || '';
+      newCssInput.value = localStorage.getItem('newCss') || '';
+      resultOutput.value = localStorage.getItem('resultCss') || '';
+      
+      // Parse CSS into a structured object
+      function parseCSS(css) {
+        const result = {};
+        // Remove comments
+        css = css.replace(/\/\*[\s\S]*?\*\//g, '');
+        
+        // Split the CSS into rule blocks
+        let blocks = css.split('}');
+        
+        blocks.forEach(block => {
+          // Skip empty blocks
+          if (block.trim() === '') return;
+          
+          // Find the selector and declarations
+          const parts = block.split('{');
+          if (parts.length < 2) return;
+          
+          const selectors = parts[0].trim();
+          const declarations = parts[1].trim();
+          
+          // Skip if there are no declarations
+          if (!declarations) return;
+          
+          // Create a map of property: value for each selector
+          if (!result[selectors]) {
+            result[selectors] = {};
+          }
+          
+          // Parse individual declarations
+          const declarationPairs = declarations.split(';');
+          declarationPairs.forEach(pair => {
+            if (!pair.trim()) return;
+            
+            const colonIndex = pair.indexOf(':');
+            if (colonIndex === -1) return;
+            
+            const property = pair.substring(0, colonIndex).trim();
+            const value = pair.substring(colonIndex + 1).trim();
+            
+            if (property && value) {
+              result[selectors][property] = value;
+            }
+          });
+        });
+        
+        return result;
+      }
+      
+      // Convert parsed CSS object back to string
+      function stringifyCSS(cssObject) {
+        let output = '';
+        
+        for (const selector in cssObject) {
+          const properties = cssObject[selector];
+          if (Object.keys(properties).length === 0) continue;
+          
+          output += `${selector} {\n`;
+          
+          for (const property in properties) {
+            output += `  ${property}: ${properties[property]};\n`;
+          }
+          
+          output += '}\n\n';
+        }
+        
+        return output;
+      }
+      
+      // Merge CSS objects, with new CSS taking precedence
+      function mergeCSS(oldCSS, newCSS) {
+        const result = JSON.parse(JSON.stringify(oldCSS)); // Deep clone
+        
+        // Merge in the new CSS
+        for (const selector in newCSS) {
+          if (!result[selector]) {
+            result[selector] = {};
+          }
+          
+          // Add/replace properties
+          for (const property in newCSS[selector]) {
+            result[selector][property] = newCSS[selector][property];
+          }
+        }
+        
+        return result;
+      }
+      
+      // Handle the merge action
+      mergeBtn.addEventListener('click', function() {
+        try {
+          const oldCss = oldCssInput.value;
+          const newCss = newCssInput.value;
+          
+          if (!oldCss.trim() && !newCss.trim()) {
+            showMessage('Please provide at least one CSS input', 'error');
+            return;
+          }
+          
+          const parsedOldCss = parseCSS(oldCss);
+          const parsedNewCss = parseCSS(newCss);
+          const mergedCss = mergeCSS(parsedOldCss, parsedNewCss);
+          const result = stringifyCSS(mergedCss);
+          
+          resultOutput.value = result;
+          localStorage.setItem('oldCss', oldCss);
+          localStorage.setItem('newCss', newCss);
+          localStorage.setItem('resultCss', result);
+          
+          showMessage('CSS successfully merged!', 'success');
+        } catch (error) {
+          console.error('Error merging CSS:', error);
+          showMessage('Error merging CSS. Check console for details.', 'error');
+        }
+      });
+      
+      // Clear all fields
+      clearBtn.addEventListener('click', function() {
+        oldCssInput.value = '';
+        newCssInput.value = '';
+        resultOutput.value = '';
+        localStorage.removeItem('oldCss');
+        localStorage.removeItem('newCss');
+        localStorage.removeItem('resultCss');
+        hideMessage();
+      });
+      
+      // Copy result to clipboard
+      copyBtn.addEventListener('click', function() {
+        if (!resultOutput.value.trim()) {
+          showMessage('Nothing to copy', 'error');
+          return;
+        }
+        
+        resultOutput.select();
+        document.execCommand('copy');
+        showMessage('Copied to clipboard!', 'success');
+      });
+      
+      // Show message with specified type
+      function showMessage(text, type) {
+        messageDiv.textContent = text;
+        messageDiv.className = 'message ' + type;
+        messageDiv.style.display = 'block';
+        
+        // Hide after 3 seconds
+        setTimeout(hideMessage, 3000);
+      }
+      
+      // Hide message
+      function hideMessage() {
+        messageDiv.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
