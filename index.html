@@ -141,261 +141,336 @@
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-  const oldCssInput = document.getElementById('old-css');
-  const newCssInput = document.getElementById('new-css');
-  const resultOutput = document.getElementById('result');
-  const mergeBtn = document.getElementById('merge-btn');
-  const clearBtn = document.getElementById('clear-btn');
-  const copyBtn = document.getElementById('copy-btn');
-  const messageDiv = document.getElementById('message');
-  
-  // Load from localStorage if available
-  oldCssInput.value = localStorage.getItem('oldCss') || '';
-  newCssInput.value = localStorage.getItem('newCss') || '';
-  resultOutput.value = localStorage.getItem('resultCss') || '';
-  
-  // CSS parser that handles complex structures including at-rules
-  function parseCSS(css) {
-    // Remove comments first
-    css = css.replace(/\/\*[\s\S]*?\*\//g, '');
-    
-    const parsedCSS = {
-      rules: {},
-      atRules: []
-    };
-    
-    // Extract @-rules and store them separately
-    const cssWithoutComplexAtRules = css.replace(
-      /(@(?:media|keyframes|supports|layer|container|font-face)(?:[^{]|\([^)]*\))*\{)([\s\S]*?)(\}(?![\s\S]*?\}))/g,
-      function(match) {
-        parsedCSS.atRules.push(match);
-        return '';
-      }
-    );
-    
-    // Handle simple @-rules like @import and @charset
-    const cssWithoutSimpleAtRules = cssWithoutComplexAtRules.replace(
-      /@(?:import|charset|namespace|page|property|counter-style|font-feature-values)(?:[^;]*);/g,
-      function(match) {
-        parsedCSS.atRules.push(match);
-        return '';
-      }
-    );
-    
-    // Process the remaining CSS rules
-    let remainingCSS = cssWithoutSimpleAtRules;
-    let bracketCount = 0;
-    let currentRule = '';
-    
-    for (let i = 0; i < remainingCSS.length; i++) {
-      const char = remainingCSS[i];
-      currentRule += char;
-      
-      if (char === '{') {
-        bracketCount++;
-      } else if (char === '}') {
-        bracketCount--;
+  document.addEventListener('DOMContentLoaded', function() {
+    const oldCssInput = document.getElementById('old-css');
+    const newCssInput = document.getElementById('new-css');
+    const resultOutput = document.getElementById('result');
+    const mergeBtn = document.getElementById('merge-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const copyBtn = document.getElementById('copy-btn');
+    const messageDiv = document.getElementById('message');
+
+    oldCssInput.value = localStorage.getItem('oldCss') || '';
+    newCssInput.value = localStorage.getItem('newCss') || '';
+    resultOutput.value = localStorage.getItem('resultCss') || '';
+
+    /* Replace this */
+    // CSS parser that handles complex structures including at-rules and basic nesting
+    function parseCSS(css) {
+        css = css.replace(/\/\*[\s\S]*?\*\//g, ''); // Remove comments
+
+        const parsed = {
+            rules: {}, // selector -> { declarations: {}, children: [] }
+            atRules: [] // Stores top-level @-rules as raw strings
+        };
+
+        let remainingCss = css;
+
+        // Extract block @-rules (e.g., @media, @keyframes, @supports, @layer, @container, @font-face, @document, @scope, @starting-style)
+        remainingCss = remainingCss.replace(
+            /(@(?:media|keyframes|supports|layer|container|font-face|document|scope|starting-style)(?:[^{]|\([^)]*\))*\{)([\s\S]*?)(\}(?![\s\S]*?\}))/g,
+            function(match) {
+                parsed.atRules.push(match);
+                return '';
+            }
+        );
+
+        // Extract simple @-rules (e.g., @import, @charset, @namespace, @page, @property, @counter-style, @font-feature-values)
+        remainingCss = remainingCss.replace(
+            /@(?:import|charset|namespace|page|property|counter-style|font-feature-values)(?:[^;]*);/g,
+            function(match) {
+                parsed.atRules.push(match);
+                return '';
+            }
+        );
         
-        // If we've closed a top-level rule
-        if (bracketCount === 0 && currentRule.trim()) {
-          const rule = currentRule.trim();
-          processRule(rule, parsedCSS);
-          currentRule = '';
+        let depth = 0;
+        let ruleBuffer = "";    // For accumulating content of a rule or a selector
+        let selectorBuffer = "";// Stores the current selector string being built
+        let inSelectorPart = true; // True if currently parsing the selector part of a rule
+
+        for (let i = 0; i < remainingCss.length; i++) {
+            const char = remainingCss[i];
+
+            if (char === '{') {
+                if (depth === 0) { // Start of a rule's content block
+                    if (inSelectorPart) { // Finalize selector if we were in selector part
+                       selectorBuffer = ruleBuffer.trim();
+                       ruleBuffer = ""; // Reset ruleBuffer for content
+                    }
+                    inSelectorPart = false; // Now parsing content
+                }
+                ruleBuffer += char;
+                depth++;
+            } else if (char === '}') {
+                depth--;
+                ruleBuffer += char;
+                if (depth === 0) { // End of a top-level rule block
+                    if (selectorBuffer) {
+                        const contentWithBraces = ruleBuffer;
+                        const contentWithoutBraces = contentWithBraces.substring(1, contentWithBraces.length - 1).trim();
+                        
+                        const { declarations, children } = parseRuleContent(contentWithoutBraces);
+
+                        const selectors = selectorBuffer.split(',').map(s => s.trim()).filter(s => s);
+                        selectors.forEach(sel => {
+                            if (!parsed.rules[sel]) {
+                                parsed.rules[sel] = { declarations: {}, children: [] };
+                            }
+                            Object.assign(parsed.rules[sel].declarations, declarations);
+                            // Deduplicate children strings if desired, here just concatenating during parse
+                            parsed.rules[sel].children.push(...children);
+                        });
+                    }
+                    ruleBuffer = "";
+                    selectorBuffer = "";
+                    inSelectorPart = true; // Ready for next selector
+                }
+            } else {
+                 ruleBuffer += char; // Accumulate selector or content characters
+            }
+             if (depth < 0) { // Should not happen in well-formed CSS
+                console.warn("Malformed CSS: Unbalanced braces, too many '}'. Current buffer:", ruleBuffer);
+                // Reset and try to continue
+                depth = 0; 
+                ruleBuffer = ""; 
+                selectorBuffer = "";
+                inSelectorPart = true;
+            }
         }
-      }
-    }
-    
-    return parsedCSS;
-  }
-  
-  // Process a single CSS rule
-  function processRule(rule, parsedCSS) {
-    // Find the selector and the declarations
-    const selectorEnd = rule.indexOf('{');
-    if (selectorEnd === -1) return;
-    
-    const selector = rule.substring(0, selectorEnd).trim();
-    const declarations = rule.substring(selectorEnd + 1, rule.lastIndexOf('}')).trim();
-    
-    // Skip empty rules
-    if (!declarations) return;
-    
-    // Handle multiple selectors (comma-separated)
-    const selectors = selector.split(',').map(s => s.trim());
-    
-    selectors.forEach(selector => {
-      if (!parsedCSS.rules[selector]) {
-        parsedCSS.rules[selector] = {};
-      }
-      
-      // Parse declarations
-      const declarationList = declarations.split(';');
-      declarationList.forEach(declaration => {
-        const d = declaration.trim();
-        if (!d) return;
-        
-        const colonIndex = d.indexOf(':');
-        if (colonIndex === -1) return;
-        
-        const property = d.substring(0, colonIndex).trim();
-        const value = d.substring(colonIndex + 1).trim();
-        
-        if (property && value) {
-          parsedCSS.rules[selector][property] = value;
+        if (depth !== 0 && ruleBuffer.trim()) {
+             console.warn("Malformed CSS: Unbalanced braces at end. Final buffer:", ruleBuffer.trim());
         }
-      });
+
+
+        return parsed;
+    }
+
+    // Parses the content of a rule block for declarations and direct child rule blocks (as strings)
+    function parseRuleContent(content) {
+        const declarations = {};
+        const children = [];
+        let i = 0;
+
+        while (i < content.length) {
+            // Skip leading whitespace
+            while (i < content.length && /\s/.test(content[i])) {
+                i++;
+            }
+            if (i >= content.length) break;
+
+            let segmentStartIndex = i;
+            let currentDepth = 0;
+            let isBlock = false;
+            
+            // Scan to find the end of the current declaration or nested block
+            while (i < content.length) {
+                if (content[i] === '{') {
+                    currentDepth++;
+                    isBlock = true; 
+                } else if (content[i] === '}') {
+                    currentDepth--;
+                } else if (content[i] === ';' && currentDepth === 0) {
+                    // End of a declaration
+                    i++; // Include the semicolon
+                    break; 
+                }
+                
+                i++; // Move to next character
+                
+                if (isBlock && currentDepth === 0) {
+                    // End of a nested block
+                    break;
+                }
+                if (currentDepth < 0) { // Malformed CSS (e.g. unexpected '}')
+                    break;
+                }
+            }
+
+            const segment = content.substring(segmentStartIndex, i).trim();
+
+            if (segment) {
+                if (isBlock && segment.endsWith('}')) { // It's a nested block
+                    children.push(segment);
+                } else { // Assume it's a declaration
+                    let declContent = segment;
+                    if (segment.endsWith(';')) {
+                        declContent = segment.substring(0, segment.length - 1).trim();
+                    }
+                    const colonIndex = declContent.indexOf(':');
+                    if (colonIndex > 0) {
+                        const prop = declContent.substring(0, colonIndex).trim();
+                        const val = declContent.substring(colonIndex + 1).trim();
+                        if (prop) { // Allow empty value if property name exists
+                            declarations[prop] = val;
+                        }
+                    } else if (declContent) { 
+                        // Not a valid prop:value, but not a block either. Preserve as a child.
+                        // This could be an @apply rule or something similar, or malformed.
+                        children.push(segment + (segment.endsWith(';') ? '' : ';'));
+                    }
+                }
+            }
+        }
+        return { declarations, children };
+    }
+    
+    // Convert parsed CSS back to a string
+    function stringifyCSS(parsedCSS) {
+        let output = '';
+
+        for (const selector in parsedCSS.rules) {
+            const ruleData = parsedCSS.rules[selector];
+            const declarations = ruleData.declarations;
+            const children = ruleData.children || [];
+
+            if (Object.keys(declarations).length === 0 && children.length === 0) continue;
+
+            output += `${selector} {\n`;
+
+            // Output declarations first
+            for (const property in declarations) {
+                output += `  ${property}: ${declarations[property]};\n`;
+            }
+
+            // Output children (nested rules/strings), indenting them
+            const uniqueChildren = Array.from(new Set(children)); // Deduplicate children for stringify
+            uniqueChildren.forEach(childString => {
+                const lines = childString.split('\n');
+                lines.forEach(line => {
+                    output += `  ${line.trim()}\n`;
+                });
+            });
+
+            output += '}\n\n';
+        }
+
+        parsedCSS.atRules.forEach(rule => {
+            output += rule + '\n\n';
+        });
+
+        return output.trim();
+    }
+
+    // Merge CSS objects
+    function mergeCSS(oldCSS, newCSS) {
+        const result = {
+            rules: JSON.parse(JSON.stringify(oldCSS.rules || {})),
+            atRules: [...(oldCSS.atRules || [])]
+        };
+
+        for (const selector in newCSS.rules) {
+            if (!result.rules[selector]) {
+                result.rules[selector] = { declarations: {}, children: [] };
+            } else { // Ensure existing structure
+                result.rules[selector].declarations = result.rules[selector].declarations || {};
+                result.rules[selector].children = result.rules[selector].children || [];
+            }
+            
+            if (newCSS.rules[selector].declarations) {
+                Object.assign(result.rules[selector].declarations, newCSS.rules[selector].declarations);
+            }
+
+            if (newCSS.rules[selector].children) {
+                // Append new children and then deduplicate based on string content
+                const combinedChildren = result.rules[selector].children.concat(newCSS.rules[selector].children);
+                result.rules[selector].children = Array.from(new Set(combinedChildren));
+            }
+        }
+
+        if (newCSS.atRules) {
+            const atRuleMap = new Map();
+            result.atRules.forEach(rule => atRuleMap.set(rule.trim(), true));
+            newCSS.atRules.forEach(rule => atRuleMap.set(rule.trim(), true));
+            result.atRules = Array.from(atRuleMap.keys());
+        }
+        return result;
+    }
+    /* End Replace this */
+
+    mergeBtn.addEventListener('click', function() {
+      try {
+        const oldCssText = oldCssInput.value;
+        const newCssText = newCssInput.value;
+        
+        if (!oldCssText.trim() && !newCssText.trim()) {
+          showMessage('Please provide at least one CSS input', 'error');
+          return;
+        }
+        
+        const parsedOldCss = parseCSS(oldCssText);
+        const parsedNewCss = parseCSS(newCssText);
+        const mergedCssData = mergeCSS(parsedOldCss, parsedNewCss);
+        const resultText = stringifyCSS(mergedCssData);
+        
+        resultOutput.value = resultText;
+        localStorage.setItem('oldCss', oldCssText);
+        localStorage.setItem('newCss', newCssText);
+        localStorage.setItem('resultCss', resultText);
+        
+        showMessage('CSS successfully merged!', 'success');
+      } catch (error) {
+        console.error('Error merging CSS:', error);
+        showMessage('Error merging CSS. Check console for details. Error: ' + error.message, 'error');
+      }
     });
-  }
-  
-  // Convert parsed CSS back to a string
-  function stringifyCSS(parsedCSS) {
-    let output = '';
-    
-    // Add regular CSS rules
-    for (const selector in parsedCSS.rules) {
-      const properties = parsedCSS.rules[selector];
-      if (Object.keys(properties).length === 0) continue;
-      
-      output += `${selector} {\n`;
-      
-      for (const property in properties) {
-        output += `  ${property}: ${properties[property]};\n`;
-      }
-      
-      output += '}\n\n';
-    }
-    
-    // Add at-rules
-    parsedCSS.atRules.forEach(rule => {
-      output += rule + '\n\n';
-    });
-    
-    return output;
-  }
-  
-  // Merge CSS objects
-  function mergeCSS(oldCSS, newCSS) {
-    const result = {
-      rules: JSON.parse(JSON.stringify(oldCSS.rules || {})),
-      atRules: [...(oldCSS.atRules || [])]
-    };
-    
-    // Merge rules
-    for (const selector in newCSS.rules) {
-      if (!result.rules[selector]) {
-        result.rules[selector] = {};
-      }
-      
-      for (const property in newCSS.rules[selector]) {
-        result.rules[selector][property] = newCSS.rules[selector][property];
-      }
-    }
-    
-    // Combine at-rules
-    if (newCSS.atRules) {
-      // Create a map to deduplicate identical at-rules
-      const atRuleMap = new Map();
-      
-      // First add existing rules to map
-      result.atRules.forEach(rule => {
-        atRuleMap.set(rule, true);
-      });
-      
-      // Then add new rules, overwriting any duplicates
-      newCSS.atRules.forEach(rule => {
-        atRuleMap.set(rule, true);
-      });
-      
-      // Convert back to array
-      result.atRules = Array.from(atRuleMap.keys());
-    }
-    
-    return result;
-  }
-  
-  // Handle merging action
-  mergeBtn.addEventListener('click', function() {
-    try {
-      const oldCss = oldCssInput.value;
-      const newCss = newCssInput.value;
-      
-      if (!oldCss.trim() && !newCss.trim()) {
-        showMessage('Please provide at least one CSS input', 'error');
+
+    copyBtn.addEventListener('click', function() {
+      if (!resultOutput.value.trim()) {
+        showMessage('Nothing to copy', 'error');
         return;
       }
       
-      const parsedOldCss = parseCSS(oldCss);
-      const parsedNewCss = parseCSS(newCss);
-      const mergedCss = mergeCSS(parsedOldCss, parsedNewCss);
-      const result = stringifyCSS(mergedCss);
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(resultOutput.value)
+          .then(() => {
+            showMessage('Copied to clipboard!', 'success');
+          })
+          .catch(err => {
+            console.error('Failed to copy: ', err);
+            fallbackCopy();
+          });
+      } else {
+        fallbackCopy();
+      }
+    });
+
+    function fallbackCopy() {
+      resultOutput.select();
+      document.execCommand('copy');
+      // Deselect after copying
+      if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+      } else if (document.selection) {
+        document.selection.empty();
+      }
+      showMessage('Copied to clipboard (fallback)!', 'success');
+    }
+
+    clearBtn.addEventListener('click', function() {
+      oldCssInput.value = '';
+      newCssInput.value = '';
+      resultOutput.value = '';
+      localStorage.removeItem('oldCss');
+      localStorage.removeItem('newCss');
+      localStorage.removeItem('resultCss');
+      hideMessage();
+    });
+
+    let messageTimeout;
+    function showMessage(text, type) {
+      clearTimeout(messageTimeout);
+      messageDiv.textContent = text;
+      messageDiv.className = 'message ' + type;
+      messageDiv.style.display = 'block';
       
-      resultOutput.value = result;
-      localStorage.setItem('oldCss', oldCss);
-      localStorage.setItem('newCss', newCss);
-      localStorage.setItem('resultCss', result);
-      
-      showMessage('CSS successfully merged!', 'success');
-    } catch (error) {
-      console.error('Error merging CSS:', error);
-      showMessage('Error merging CSS. Check console for details.', 'error');
+      messageTimeout = setTimeout(hideMessage, 3000);
+    }
+
+    function hideMessage() {
+      messageDiv.style.display = 'none';
     }
   });
-  
-  // Copy to clipboard using modern navigator.clipboard API when available
-  copyBtn.addEventListener('click', function() {
-    if (!resultOutput.value.trim()) {
-      showMessage('Nothing to copy', 'error');
-      return;
-    }
-    
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(resultOutput.value)
-        .then(() => {
-          showMessage('Copied to clipboard!', 'success');
-        })
-        .catch(err => {
-          console.error('Failed to copy: ', err);
-          // Fallback to the older method
-          fallbackCopy();
-        });
-    } else {
-      fallbackCopy();
-    }
-  });
-  
-  function fallbackCopy() {
-    resultOutput.select();
-    document.execCommand('copy');
-    showMessage('Copied to clipboard!', 'success');
-  }
-  
-  // Clear all fields
-  clearBtn.addEventListener('click', function() {
-    oldCssInput.value = '';
-    newCssInput.value = '';
-    resultOutput.value = '';
-    localStorage.removeItem('oldCss');
-    localStorage.removeItem('newCss');
-    localStorage.removeItem('resultCss');
-    hideMessage();
-  });
-  
-  // Show message with specified type
-  function showMessage(text, type) {
-    messageDiv.textContent = text;
-    messageDiv.className = 'message ' + type;
-    messageDiv.style.display = 'block';
-    
-    // Hide after 3 seconds
-    setTimeout(hideMessage, 3000);
-  }
-  
-  // Hide message
-  function hideMessage() {
-    messageDiv.style.display = 'none';
-  }
-});
   </script>
 </body>
 </html>
