@@ -226,6 +226,7 @@
     newCssInput.value = localStorage.getItem('newCss') || '';
     resultOutput.value = localStorage.getItem('resultCss') || '';
 
+// CSS parser that handles complex structures including at-rules and basic nesting
 function parseCSS(css) {
     css = css.replace(/\/\*[\s\S]*?\*\//g, ''); // Remove comments
 
@@ -236,16 +237,20 @@ function parseCSS(css) {
 
     let remainingCss = css;
 
-    // Extract block @-rules (e.g., @media, @keyframes, @supports, @layer, @container, @font-face, @document, @scope, @starting-style)
+    // Extract block @-rules with better pattern to handle empty rules
     remainingCss = remainingCss.replace(
-        /(@(?:media|keyframes|supports|layer|container|font-face|document|scope|starting-style)(?:[^{]|\([^)]*\))*\{)([\s\S]*?)(\}(?![\s\S]*?\}))/g,
+        /(@(?:media|keyframes|supports|layer|container|font-face|document|scope|starting-style)(?:[^{]|\([^)]*\))*\{)((?:[^{}]|\{[^}]*\})*)\}/g,
         function(match) {
-            parsed.atRules.push(match);
+            // Only keep non-empty @rules
+            const content = match.match(/\{([\s\S]*)\}$/);
+            if (content && content[1].trim()) {
+                parsed.atRules.push(match);
+            }
             return '';
         }
     );
 
-    // Extract simple @-rules (e.g., @import, @charset, @namespace, @page, @property, @counter-style, @font-feature-values)
+    // Extract simple @-rules
     remainingCss = remainingCss.replace(
         /@(?:import|charset|namespace|page|property|counter-style|font-feature-values)(?:[^;]*);/g,
         function(match) {
@@ -255,62 +260,60 @@ function parseCSS(css) {
     );
     
     let depth = 0;
-    let ruleBuffer = "";    // For accumulating content of a rule or a selector
-    let selectorBuffer = "";// Stores the current selector string being built
-    let inSelectorPart = true; // True if currently parsing the selector part of a rule
+    let ruleBuffer = "";
+    let selectorBuffer = "";
+    let inSelectorPart = true;
 
     for (let i = 0; i < remainingCss.length; i++) {
         const char = remainingCss[i];
 
         if (char === '{') {
-            if (depth === 0) { // Start of a rule's content block
-                if (inSelectorPart) { // Finalize selector if we were in selector part
+            if (depth === 0) {
+                if (inSelectorPart) {
                    selectorBuffer = ruleBuffer.trim();
-                   ruleBuffer = ""; // Reset ruleBuffer for content
+                   ruleBuffer = "";
                 }
-                inSelectorPart = false; // Now parsing content
+                inSelectorPart = false;
             }
             ruleBuffer += char;
             depth++;
         } else if (char === '}') {
             depth--;
+            if (depth < 0) {
+                // Skip unmatched closing braces
+                depth = 0;
+                continue;
+            }
             ruleBuffer += char;
-            if (depth === 0) { // End of a top-level rule block
+            if (depth === 0) {
                 if (selectorBuffer) {
                     const contentWithBraces = ruleBuffer;
                     const contentWithoutBraces = contentWithBraces.substring(1, contentWithBraces.length - 1).trim();
                     
-                    const { declarations, children } = parseRuleContent(contentWithoutBraces);
-
-                    const selectors = selectorBuffer.split(',').map(s => s.trim()).filter(s => s);
-                    selectors.forEach(sel => {
-                        if (!parsed.rules[sel]) {
-                            parsed.rules[sel] = { declarations: {}, children: [] };
-                        }
-                        // Merge declarations - later ones override earlier ones
-                        Object.assign(parsed.rules[sel].declarations, declarations);
-                        // Append children
-                        parsed.rules[sel].children.push(...children);
-                    });
+                    // Only process if there's actual content
+                    if (contentWithoutBraces) {
+                        const { declarations, children } = parseRuleContent(contentWithoutBraces);
+                        
+                        // Clean up malformed selectors
+                        selectorBuffer = selectorBuffer.replace(/:\s+/g, ':'); // Fix "a: hover" to "a:hover"
+                        
+                        const selectors = selectorBuffer.split(',').map(s => s.trim()).filter(s => s && !s.endsWith(';'));
+                        selectors.forEach(sel => {
+                            if (!parsed.rules[sel]) {
+                                parsed.rules[sel] = { declarations: {}, children: [] };
+                            }
+                            Object.assign(parsed.rules[sel].declarations, declarations);
+                            parsed.rules[sel].children.push(...children);
+                        });
+                    }
                 }
                 ruleBuffer = "";
                 selectorBuffer = "";
-                inSelectorPart = true; // Ready for next selector
+                inSelectorPart = true;
             }
         } else {
-             ruleBuffer += char; // Accumulate selector or content characters
+             ruleBuffer += char;
         }
-         if (depth < 0) { // Should not happen in well-formed CSS
-            console.warn("Malformed CSS: Unbalanced braces, too many '}'. Current buffer:", ruleBuffer);
-            // Reset and try to continue
-            depth = 0; 
-            ruleBuffer = ""; 
-            selectorBuffer = "";
-            inSelectorPart = true;
-        }
-    }
-    if (depth !== 0 && ruleBuffer.trim()) {
-         console.warn("Malformed CSS: Unbalanced braces at end. Final buffer:", ruleBuffer.trim());
     }
 
     return parsed;
