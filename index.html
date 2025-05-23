@@ -456,54 +456,46 @@ function parseCSS(css) {
         }
         return result;
     }
-    /* End Replace this */
 
     mergeBtn.addEventListener('click', function() {
-      try {
-        const oldCssText = oldCssInput.value;
-        const newCssText = newCssInput.value;
-        
-        if (!oldCssText.trim() && !newCssText.trim()) {
-          showMessage('Please provide at least one CSS input', 'error');
-          return;
-        }
-        
-        const parsedOldCss = parseCSS(oldCssText);
-        const parsedNewCss = parseCSS(newCssText);
-        const mergedCssData = mergeCSS(parsedOldCss, parsedNewCss);
-        const resultText = stringifyCSS(mergedCssData);
-        
-        resultOutput.value = resultText;
-        localStorage.setItem('oldCss', oldCssText);
-        localStorage.setItem('newCss', newCssText);
-        localStorage.setItem('resultCss', resultText);
-        
-        showMessage('CSS successfully merged!', 'success');
-      } catch (error) {
-        console.error('Error merging CSS:', error);
-        showMessage('Error merging CSS. Check console for details. Error: ' + error.message, 'error');
-      }
-    });
-
-    copyBtn.addEventListener('click', function() {
-      if (!resultOutput.value.trim()) {
-        showMessage('Nothing to copy', 'error');
+    try {
+      const oldCssText = oldCssInput.value;
+      const newCssText = newCssInput.value;
+      
+      if (!oldCssText.trim() && !newCssText.trim()) {
+        showMessage('Please provide at least one CSS input', 'error');
         return;
       }
       
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(resultOutput.value)
-          .then(() => {
-            showMessage('Copied to clipboard!', 'success');
-          })
-          .catch(err => {
-            console.error('Failed to copy: ', err);
-            fallbackCopy();
-          });
-      } else {
-        fallbackCopy();
+      // If only old CSS is provided, merge duplicates within it
+      if (oldCssText.trim() && !newCssText.trim()) {
+        const parsedCss = parseCSS(oldCssText);
+        const resultText = stringifyCSS(parsedCss);
+        resultOutput.value = resultText;
+        localStorage.setItem('oldCss', oldCssText);
+        localStorage.setItem('newCss', '');
+        localStorage.setItem('resultCss', resultText);
+        showMessage('CSS successfully merged!', 'success');
+        return;
       }
-    });
+      
+      // If both are provided, merge them
+      const parsedOldCss = parseCSS(oldCssText);
+      const parsedNewCss = parseCSS(newCssText);
+      const mergedCssData = mergeCSS(parsedOldCss, parsedNewCss);
+      const resultText = stringifyCSS(mergedCssData);
+      
+      resultOutput.value = resultText;
+      localStorage.setItem('oldCss', oldCssText);
+      localStorage.setItem('newCss', newCssText);
+      localStorage.setItem('resultCss', resultText);
+      
+      showMessage('CSS successfully merged!', 'success');
+    } catch (error) {
+      console.error('Error merging CSS:', error);
+      showMessage('Error merging CSS. Check console for details. Error: ' + error.message, 'error');
+    }
+  });
 
     function fallbackCopy() {
       resultOutput.select();
