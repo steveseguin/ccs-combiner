@@ -168,24 +168,62 @@
         grid-template-columns: 1fr;
         padding: 24px;
       }
-      
+
       .btn-container {
         flex-direction: column;
       }
-      
+
       .btn-group {
         width: 100%;
       }
-      
+
       button {
         flex: 1;
+      }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --primary: #3b82f6;
+        --primary-hover: #2563eb;
+        --secondary: #374151;
+        --secondary-hover: #4b5563;
+        --text: #f3f4f6;
+        --light-text: #9ca3af;
+        --success: #34d399;
+        --success-bg: #064e3b;
+        --error: #f87171;
+        --error-bg: #7f1d1d;
+        --border: #374151;
+      }
+
+      body {
+        background-color: #111827;
+      }
+
+      .container {
+        background-color: #1f2937;
+      }
+
+      textarea {
+        background-color: #111827;
+        color: #f3f4f6;
+      }
+
+      h1 {
+        color: #60a5fa;
+      }
+
+      .subtitle {
+        color: #9ca3af;
       }
     }
   </style>
 </head>
 <body>
   <h1>CSS Merger</h1>
-  
+  <p class="subtitle" style="text-align:center;color:var(--light-text);margin-bottom:24px;font-size:15px;">Intelligently merge two CSS files &mdash; combines selectors, deduplicates properties, and preserves @-rules.</p>
+
   <div class="container">
     <div>
       <label for="old-css">Old CSS:</label>
@@ -512,6 +550,22 @@ function parseCSS(css) {
       showMessage('Copied to clipboard (fallback)!', 'success');
     }
 
+    copyBtn.addEventListener('click', function() {
+      if (!resultOutput.value.trim()) {
+        showMessage('Nothing to copy!', 'error');
+        return;
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(resultOutput.value).then(() => {
+          showMessage('Copied to clipboard!', 'success');
+        }).catch(() => {
+          fallbackCopy();
+        });
+      } else {
+        fallbackCopy();
+      }
+    });
+
     clearBtn.addEventListener('click', function() {
       oldCssInput.value = '';
       newCssInput.value = '';
@@ -525,10 +579,13 @@ function parseCSS(css) {
     let messageTimeout;
     function showMessage(text, type) {
       clearTimeout(messageTimeout);
+      messageDiv.style.display = 'block';
       messageDiv.textContent = text;
       messageDiv.className = 'message ' + type;
-      messageDiv.classList.add('visible');
-      
+      requestAnimationFrame(() => {
+        messageDiv.classList.add('visible');
+      });
+
       messageTimeout = setTimeout(hideMessage, 3000);
     }
 
