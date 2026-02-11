@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CSS Merger</title>
+  <meta name="description" content="Intelligently merge two CSS files online. Combines selectors, deduplicates properties, and preserves @-rules.">
   <style>
     * {
       box-sizing: border-box;
@@ -163,6 +164,39 @@
       border: 1px solid rgba(239, 68, 68, 0.2);
     }
     
+    .input-wrapper {
+      position: relative;
+    }
+
+    .drop-hint {
+      font-size: 12px;
+      color: var(--light-text);
+      margin-top: 4px;
+    }
+
+    .input-wrapper.dragover textarea {
+      border-color: var(--primary);
+      border-style: dashed;
+      background-color: rgba(37, 99, 235, 0.05);
+    }
+
+    .shortcut-hint {
+      text-align: center;
+      font-size: 12px;
+      color: var(--light-text);
+      margin-top: 8px;
+      grid-column: 1 / -1;
+    }
+
+    kbd {
+      background: var(--secondary);
+      border-radius: 3px;
+      padding: 1px 6px;
+      font-family: inherit;
+      font-size: 11px;
+      border: 1px solid var(--border);
+    }
+
     @media (max-width: 768px) {
       .container {
         grid-template-columns: 1fr;
@@ -225,14 +259,16 @@
   <p class="subtitle" style="text-align:center;color:var(--light-text);margin-bottom:24px;font-size:15px;">Intelligently merge two CSS files &mdash; combines selectors, deduplicates properties, and preserves @-rules.</p>
 
   <div class="container">
-    <div>
+    <div class="input-wrapper" id="old-wrapper">
       <label for="old-css">Old CSS:</label>
-      <textarea id="old-css" placeholder="Paste your old CSS here..."></textarea>
+      <textarea id="old-css" placeholder="Paste your old CSS here, or drop a .css file..."></textarea>
+      <div class="drop-hint">Drop .css file here</div>
     </div>
-    
-    <div>
+
+    <div class="input-wrapper" id="new-wrapper">
       <label for="new-css">New CSS:</label>
-      <textarea id="new-css" placeholder="Paste your new CSS here..."></textarea>
+      <textarea id="new-css" placeholder="Paste your new CSS here, or drop a .css file..."></textarea>
+      <div class="drop-hint">Drop .css file here</div>
     </div>
     
     <div class="output-container">
@@ -248,6 +284,7 @@
       </div>
       <button id="copy-btn" class="copy">Copy Result</button>
     </div>
+    <div class="shortcut-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to merge &middot; <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> to copy result</div>
   </div>
 
   <script>
@@ -619,6 +656,50 @@ function parseCSS(css) {
         oldCssInput.parentElement.style.opacity = '1';
         newCssInput.parentElement.style.opacity = '1';
       });
+    });
+
+    // Drag and drop support
+    function setupDropZone(wrapper, textarea) {
+      ['dragenter', 'dragover'].forEach(evt => {
+        wrapper.addEventListener(evt, (e) => {
+          e.preventDefault();
+          wrapper.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(evt => {
+        wrapper.addEventListener(evt, () => {
+          wrapper.classList.remove('dragover');
+        });
+      });
+      wrapper.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (file && (file.name.endsWith('.css') || file.type === 'text/css' || file.type === 'text/plain')) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            textarea.value = ev.target.result;
+            showMessage('Loaded ' + file.name, 'success');
+          };
+          reader.readAsText(file);
+        } else {
+          showMessage('Please drop a .css file', 'error');
+        }
+      });
+    }
+
+    setupDropZone(document.getElementById('old-wrapper'), oldCssInput);
+    setupDropZone(document.getElementById('new-wrapper'), newCssInput);
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        mergeBtn.click();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'C') {
+        e.preventDefault();
+        copyBtn.click();
+      }
     });
   });
   </script>
