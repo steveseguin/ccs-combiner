@@ -127,3 +127,29 @@ test('does not reject an escaped URL function with a comment-looking marker', ()
     assert.ok(output.includes(String.raw`background-image: u\72l(https://example.com/*);`), output);
     assert.ok(output.includes('color: red;'), output);
 });
+
+
+for (const selector of [
+    ':is(.primary, .secondary)',
+    '.item:not(.disabled, .hidden)',
+    '.card:has(> img, > video)',
+    ':where(.a, :is(.b, .c))',
+    ':is([data-label="a,b"], .secondary)',
+    String.raw`:is(.a\,b, .c\(d)`
+]) {
+    test(`preserves functional selector list ${selector}`, () => {
+        const output = app().merge(`${selector} { color: red; padding: 5px; }`, `${selector} { color: blue; }`);
+        assert.equal(output, `${selector} {\n  color: blue;\n  padding: 5px;\n}`);
+    });
+}
+test('splits only top-level lists around nested functions', () => {
+    const output = app().merge('.plain, :is(.a, :not(.b, .c)), .last { color: red; }');
+    assert.equal(output, '.plain {\n  color: red;\n}\n\n:is(.a, :not(.b, .c)) {\n  color: red;\n}\n\n.last {\n  color: red;\n}');
+});
+test('quoted and escaped parentheses do not change selector depth', () => {
+    const output = app().merge(String.raw`[data-label="("], .a\(b, .last { color: red; }`);
+    assert.equal(output, '[data-label="("] {\n  color: red;\n}\n\n.a\\(b {\n  color: red;\n}\n\n.last {\n  color: red;\n}');
+});
+test('ordinary selector groups still merge with new precedence', () => {
+    assert.equal(app().merge('.a, .b { color: red; }', '.a { color: blue; }'), '.a {\n  color: blue;\n}\n\n.b {\n  color: red;\n}');
+});

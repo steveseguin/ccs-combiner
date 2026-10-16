@@ -435,7 +435,22 @@ function parseCSS(css) {
                         // Clean up malformed selectors
                         selectorBuffer = selectorBuffer.replace(/:\s+/g, ':'); // Fix "a: hover" to "a:hover"
                         
-                        const selectors = selectorBuffer.split(',').map(s => s.trim()).filter(s => s && !s.endsWith(';'));
+                        // Only top-level commas separate selectors. Functional pseudo-classes
+                        // such as :is(), :not(), and :has() contain their own lists.
+                        const selectorParts = [];
+                        let selectorStart = 0;
+                        let parenthesisDepth = 0;
+                        for (let j = 0; j < selectorBuffer.length; j++) {
+                            const character = selectorBuffer[j];
+                            if (character === '(') parenthesisDepth++;
+                            else if (character === ')') parenthesisDepth--;
+                            else if (character === ',' && parenthesisDepth === 0) {
+                                selectorParts.push(selectorBuffer.slice(selectorStart, j));
+                                selectorStart = j + 1;
+                            }
+                        }
+                        selectorParts.push(selectorBuffer.slice(selectorStart));
+                        const selectors = selectorParts.map(s => s.trim()).filter(s => s && !s.endsWith(';'));
                         selectors.forEach(sel => {
                             sel = restore(sel);
                             if (!parsed.rules[sel]) {
@@ -783,4 +798,5 @@ function parseCSS(css) {
   </script>
 </body>
 </html>
+
 
