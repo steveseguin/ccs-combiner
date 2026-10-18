@@ -6,286 +6,480 @@
   <title>CSS Merger</title>
   <meta name="description" content="Two CSS files, one mess. Paste them in, get one clean file out. Deduplicates selectors, merges properties, preserves @-rules.">
   <style>
-    * {
+    *, *::before, *::after {
       box-sizing: border-box;
-      margin: 0;
-      padding: 0;
     }
-    
+
     :root {
+      color-scheme: light;
+      --bg: #f5f6f8;
+      --surface: #ffffff;
+      --surface-2: #f8f9fb;
+      --editor: #fcfcfd;
+      --border: #e2e5ea;
+      --border-strong: #cdd2da;
+      --text: #15181e;
+      --muted: #5b6472;
+      --faint: #8a93a1;
       --primary: #2563eb;
       --primary-hover: #1d4ed8;
-      --secondary: #e5e7eb;
-      --secondary-hover: #d1d5db;
-      --text: #1f2937;
-      --light-text: #6b7280;
-      --success: #10b981;
+      --primary-text: #ffffff;
+      --secondary: #ffffff;
+      --secondary-hover: #f1f3f6;
+      --success: #047857;
       --success-bg: #ecfdf5;
-      --error: #ef4444;
+      --error: #b91c1c;
       --error-bg: #fef2f2;
-      --border: #e5e7eb;
-      --shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-      --radius: 8px;
-    }
-    
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-      line-height: 1.6;
-      padding: 24px;
-      max-width: 1200px;
-      margin: 0 auto;
-      color: var(--text);
-      background-color: #f9fafb;
-    }
-    
-    h1 {
-      margin-bottom: 24px;
-      text-align: center;
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--primary);
-    }
-    
-    .container {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      background-color: white;
-      padding: 32px;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-    }
-    
-    .output-container {
-      grid-column: 1 / -1;
-      margin-top: 8px;
-    }
-    
-    textarea {
-      width: 100%;
-      min-height: 300px;
-      padding: 16px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      font-family: 'Courier New', Courier, monospace;
-      line-height: 1.4;
-      resize: vertical;
-      font-size: 14px;
-      transition: border-color 0.3s, box-shadow 0.3s;
-      background-color: #f9fafb;
-    }
-    
-    textarea:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
-    }
-    
-    label {
-      display: block;
-      margin-bottom: 10px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    
-    button {
-      padding: 12px 20px;
-      background-color: var(--primary);
-      color: white;
-      border: none;
-      border-radius: var(--radius);
-      cursor: pointer;
-      font-size: 15px;
-      font-weight: 600;
-      transition: all 0.2s;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-    }
-    
-    button:hover {
-      background-color: var(--primary-hover);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-    
-    .btn-container {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      margin-top: 24px;
-      grid-column: 1 / -1;
-    }
-    
-    .btn-group {
-      display: flex;
-      gap: 12px;
-    }
-    
-    button.secondary {
-      background-color: var(--secondary);
-      color: var(--text);
-    }
-    
-    button.secondary:hover {
-      background-color: var(--secondary-hover);
-    }
-    
-    button.copy {
-      background-color: var(--success);
-    }
-    
-    button.copy:hover {
-      background-color: #0da271;
-    }
-    
-    .message {
-      padding: 12px 16px;
-      margin-top: 16px;
-      border-radius: var(--radius);
-      text-align: center;
-      font-weight: 500;
-      opacity: 0;
-      transform: translateY(-10px);
-      transition: opacity 0.3s, transform 0.3s;
-    }
-    
-    .message.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    
-    .success {
-      background-color: var(--success-bg);
-      color: var(--success);
-      border: 1px solid rgba(16, 185, 129, 0.2);
-    }
-    
-    .error {
-      background-color: var(--error-bg);
-      color: var(--error);
-      border: 1px solid rgba(239, 68, 68, 0.2);
-    }
-    
-    .input-wrapper {
-      position: relative;
-    }
-
-    .drop-hint {
-      font-size: 12px;
-      color: var(--light-text);
-      margin-top: 4px;
-    }
-
-    .input-wrapper.dragover textarea {
-      border-color: var(--primary);
-      border-style: dashed;
-      background-color: rgba(37, 99, 235, 0.05);
-    }
-
-    .shortcut-hint {
-      text-align: center;
-      font-size: 12px;
-      color: var(--light-text);
-      margin-top: 8px;
-      grid-column: 1 / -1;
-    }
-
-    kbd {
-      background: var(--secondary);
-      border-radius: 3px;
-      padding: 1px 6px;
-      font-family: inherit;
-      font-size: 11px;
-      border: 1px solid var(--border);
-    }
-
-    @media (max-width: 768px) {
-      .container {
-        grid-template-columns: 1fr;
-        padding: 24px;
-      }
-
-      .btn-container {
-        flex-direction: column;
-      }
-
-      .btn-group {
-        width: 100%;
-      }
-
-      button {
-        flex: 1;
-      }
+      --focus: rgba(37, 99, 235, 0.28);
+      --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+      --shadow-lg: 0 10px 30px rgba(16, 24, 40, 0.14);
+      --radius: 10px;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
+        color-scheme: dark;
+        --bg: #0b0e13;
+        --surface: #12161d;
+        --surface-2: #161b23;
+        --editor: #0e1218;
+        --border: #232a35;
+        --border-strong: #323b48;
+        --text: #e7eaef;
+        --muted: #9aa3b1;
+        --faint: #6b7483;
         --primary: #3b82f6;
-        --primary-hover: #2563eb;
-        --secondary: #374151;
-        --secondary-hover: #4b5563;
-        --text: #f3f4f6;
-        --light-text: #9ca3af;
+        --primary-hover: #5b96f8;
+        --secondary: #1a2029;
+        --secondary-hover: #222a35;
         --success: #34d399;
-        --success-bg: #064e3b;
+        --success-bg: #0c2a20;
         --error: #f87171;
-        --error-bg: #7f1d1d;
-        --border: #374151;
+        --error-bg: #2d1416;
+        --focus: rgba(59, 130, 246, 0.4);
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+        --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
       }
+    }
 
-      body {
-        background-color: #111827;
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text);
+      background-color: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .topbar-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-mark {
+      display: flex;
+      flex: none;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      font-size: 13.5px;
+      color: var(--muted);
+    }
+
+    /* Workspace */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .input-wrapper,
+    .output-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      transition: opacity 0.2s, border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .output-container {
+      grid-column: 1 / -1;
+    }
+
+    .input-wrapper:focus-within,
+    .output-container:focus-within {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--focus);
+    }
+
+    .pane-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 46px;
+      padding: 7px 8px 7px 16px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pane-head label {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .pane-meta {
+      margin-right: auto;
+      font-size: 12px;
+      color: var(--faint);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    textarea {
+      display: block;
+      width: 100%;
+      min-height: 340px;
+      margin: 0;
+      padding: 14px 16px;
+      border: 0;
+      border-radius: 0;
+      outline: none;
+      resize: vertical;
+      background: var(--editor);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      tab-size: 2;
+    }
+
+    textarea::placeholder {
+      color: var(--faint);
+    }
+
+    #result {
+      min-height: 300px;
+    }
+
+    /* Drop zone */
+    .drop-hint {
+      position: absolute;
+      inset: 54px 8px 8px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px dashed var(--primary);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--editor) 90%, var(--primary));
+      color: var(--primary);
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+    }
+
+    .input-wrapper.dragover .drop-hint {
+      opacity: 1;
+    }
+
+    /* Buttons */
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 38px;
+      padding: 0 16px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: var(--primary);
+      color: var(--primary-text);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    button:hover {
+      background: var(--primary-hover);
+    }
+
+    button:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    button svg {
+      width: 16px;
+      height: 16px;
+      flex: none;
+    }
+
+    button.secondary {
+      background: var(--secondary);
+      color: var(--text);
+      border-color: var(--border-strong);
+    }
+
+    button.secondary:hover {
+      background: var(--secondary-hover);
+    }
+
+    button.small {
+      height: 30px;
+      padding: 0 10px;
+      gap: 6px;
+      background: var(--surface);
+      color: var(--muted);
+      border-color: var(--border);
+      font-size: 12.5px;
+      font-weight: 500;
+    }
+
+    button.small:hover {
+      background: var(--secondary-hover);
+      color: var(--text);
+    }
+
+    button.small svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    button.copy {
+      color: var(--text);
+    }
+
+    /* Action bar */
+    .actions {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 24px;
+      flex-wrap: wrap;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .shortcut-hint {
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+
+    kbd {
+      display: inline-block;
+      min-width: 22px;
+      padding: 1px 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.5;
+      text-align: center;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+    }
+
+    /* Toast */
+    .message {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      z-index: 10;
+      max-width: calc(100vw - 32px);
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow-lg);
+      font-size: 13.5px;
+      font-weight: 500;
+      opacity: 0;
+      transform: translate(-50%, 8px);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .message.visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .message.success {
+      color: var(--success);
+      background: var(--success-bg);
+      border-color: color-mix(in srgb, var(--success) 30%, transparent);
+    }
+
+    .message.error {
+      color: var(--error);
+      background: var(--error-bg);
+      border-color: color-mix(in srgb, var(--error) 30%, transparent);
+    }
+
+    /* Footer */
+    .site-footer {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 8px 24px 32px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px 24px;
+      flex-wrap: wrap;
+      font-size: 12.5px;
+      color: var(--faint);
+    }
+
+    @media (max-width: 800px) {
+      .topbar-inner {
+        padding: 14px 16px;
       }
 
       .container {
-        background-color: #1f2937;
+        grid-template-columns: 1fr;
+        padding: 16px;
+        gap: 12px;
       }
 
       textarea {
-        background-color: #111827;
-        color: #f3f4f6;
+        min-height: 220px;
       }
 
-      h1 {
-        color: #60a5fa;
+      #result {
+        min-height: 240px;
       }
 
-      .subtitle {
-        color: #9ca3af;
+      .actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .btn-group > button {
+        flex: 1;
+      }
+
+      .shortcut-hint {
+        text-align: center;
+      }
+
+      .site-footer {
+        padding: 4px 16px 24px;
       }
     }
-  </style>
+</style>
 </head>
 <body>
-  <h1>CSS Merger</h1>
-  <p class="subtitle" style="text-align:center;color:var(--light-text);margin-bottom:24px;font-size:15px;">You have two CSS files and they overlap. Paste them in, get one clean file out.</p>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+          <rect width="34" height="34" rx="9" fill="var(--primary)"/>
+          <path d="M11 9v4.5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V9M17 19.5V26" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <div>
+        <h1>CSS Merger</h1>
+        <p class="subtitle">You have two CSS files and they overlap. Paste them in, get one clean file out.</p>
+      </div>
+    </div>
+  </header>
 
-  <div class="container">
-    <div class="input-wrapper" id="old-wrapper">
-      <label for="old-css">Old CSS:</label>
-      <textarea id="old-css" placeholder="Paste your old CSS here, or drop a .css file..."></textarea>
+  <main class="container">
+    <section class="input-wrapper" id="old-wrapper">
+      <div class="pane-head">
+        <label for="old-css">Old CSS</label>
+        <span class="pane-meta" id="old-count">Empty</span>
+        <button type="button" class="small" id="old-load">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          Load file
+        </button>
+        <input type="file" id="old-file" accept=".css,text/css,text/plain" hidden>
+      </div>
+      <textarea id="old-css" spellcheck="false" placeholder="Paste your old CSS here, or drop a .css file..."></textarea>
       <div class="drop-hint">Drop .css file here</div>
-    </div>
+    </section>
 
-    <div class="input-wrapper" id="new-wrapper">
-      <label for="new-css">New CSS:</label>
-      <textarea id="new-css" placeholder="Paste your new CSS here, or drop a .css file..."></textarea>
+    <section class="input-wrapper" id="new-wrapper">
+      <div class="pane-head">
+        <label for="new-css">New CSS</label>
+        <span class="pane-meta" id="new-count">Empty</span>
+        <button type="button" class="small" id="new-load">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          Load file
+        </button>
+        <input type="file" id="new-file" accept=".css,text/css,text/plain" hidden>
+      </div>
+      <textarea id="new-css" spellcheck="false" placeholder="Paste your new CSS here, or drop a .css file..."></textarea>
       <div class="drop-hint">Drop .css file here</div>
-    </div>
-    
-    <div class="output-container">
-      <label for="result">Merged CSS:</label>
-      <textarea id="result" readonly placeholder="Merged CSS will appear here..."></textarea>
-      <div id="message" class="message"></div>
-    </div>
-    
-    <div class="btn-container">
+    </section>
+
+    <div class="actions">
       <div class="btn-group">
-        <button id="merge-btn">Merge CSS</button>
+        <button id="merge-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><path d="M12 14v7"/></svg>
+          Merge CSS
+        </button>
         <button id="clear-btn" class="secondary">Clear All</button>
       </div>
-      <button id="copy-btn" class="copy">Copy Result</button>
+      <div class="shortcut-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to merge &middot; <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> to copy result</div>
     </div>
-    <div class="shortcut-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to merge &middot; <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> to copy result</div>
-  </div>
+
+    <section class="output-container">
+      <div class="pane-head">
+        <label for="result">Merged CSS</label>
+        <span class="pane-meta" id="result-count">Empty</span>
+        <button id="copy-btn" class="small copy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy Result
+        </button>
+      </div>
+      <textarea id="result" readonly spellcheck="false" placeholder="Merged CSS will appear here..."></textarea>
+    </section>
+
+    <div id="message" class="message" role="status" aria-live="polite"></div>
+  </main>
+
+  <footer class="site-footer">
+    <span>Deduplicates selectors, merges properties, preserves @-rules.</span>
+    <span>Runs in your browser. Inputs are saved locally.</span>
+  </footer>
 
   <script>
   document.addEventListener('DOMContentLoaded', function() {
@@ -296,10 +490,30 @@
     const clearBtn = document.getElementById('clear-btn');
     const copyBtn = document.getElementById('copy-btn');
     const messageDiv = document.getElementById('message');
+    const oldCount = document.getElementById('old-count');
+    const newCount = document.getElementById('new-count');
+    const resultCount = document.getElementById('result-count');
 
     oldCssInput.value = localStorage.getItem('oldCss') || '';
     newCssInput.value = localStorage.getItem('newCss') || '';
     resultOutput.value = localStorage.getItem('resultCss') || '';
+
+    // Line and character counts shown in each panel header
+    function describe(text) {
+      if (!text) return 'Empty';
+      const lines = text.split('\n').length;
+      return lines + (lines === 1 ? ' line' : ' lines') + ' · ' + text.length.toLocaleString() + ' chars';
+    }
+
+    function updateCounts() {
+      oldCount.textContent = describe(oldCssInput.value);
+      newCount.textContent = describe(newCssInput.value);
+      resultCount.textContent = describe(resultOutput.value);
+    }
+
+    updateCounts();
+    oldCssInput.addEventListener('input', updateCounts);
+    newCssInput.addEventListener('input', updateCounts);
 
 // CSS parser that handles complex structures including at-rules and basic nesting
 function parseCSS(css) {
@@ -550,6 +764,7 @@ function parseCSS(css) {
         const parsedCss = parseCSS(oldCssText);
         const resultText = stringifyCSS(parsedCss);
         resultOutput.value = resultText;
+        updateCounts();
         localStorage.setItem('oldCss', oldCssText);
         localStorage.setItem('newCss', '');
         localStorage.setItem('resultCss', resultText);
@@ -564,6 +779,7 @@ function parseCSS(css) {
       const resultText = stringifyCSS(mergedCssData);
       
       resultOutput.value = resultText;
+      updateCounts();
       localStorage.setItem('oldCss', oldCssText);
       localStorage.setItem('newCss', newCssText);
       localStorage.setItem('resultCss', resultText);
@@ -607,6 +823,7 @@ function parseCSS(css) {
       oldCssInput.value = '';
       newCssInput.value = '';
       resultOutput.value = '';
+      updateCounts();
       localStorage.removeItem('oldCss');
       localStorage.removeItem('newCss');
       localStorage.removeItem('resultCss');
@@ -658,6 +875,32 @@ function parseCSS(css) {
       });
     });
 
+    function loadFile(file, textarea) {
+      if (file && (file.name.endsWith('.css') || file.type === 'text/css' || file.type === 'text/plain')) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          textarea.value = ev.target.result;
+          updateCounts();
+          showMessage('Loaded ' + file.name, 'success');
+        };
+        reader.readAsText(file);
+      } else {
+        showMessage('Please drop a .css file', 'error');
+      }
+    }
+
+    // "Load file" buttons open a hidden file picker for their panel
+    function setupFilePicker(button, fileInput, textarea) {
+      button.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', () => {
+        loadFile(fileInput.files[0], textarea);
+        fileInput.value = '';
+      });
+    }
+
+    setupFilePicker(document.getElementById('old-load'), document.getElementById('old-file'), oldCssInput);
+    setupFilePicker(document.getElementById('new-load'), document.getElementById('new-file'), newCssInput);
+
     // Drag and drop support
     function setupDropZone(wrapper, textarea) {
       ['dragenter', 'dragover'].forEach(evt => {
@@ -673,17 +916,7 @@ function parseCSS(css) {
       });
       wrapper.addEventListener('drop', (e) => {
         e.preventDefault();
-        const file = e.dataTransfer.files[0];
-        if (file && (file.name.endsWith('.css') || file.type === 'text/css' || file.type === 'text/plain')) {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            textarea.value = ev.target.result;
-            showMessage('Loaded ' + file.name, 'success');
-          };
-          reader.readAsText(file);
-        } else {
-          showMessage('Please drop a .css file', 'error');
-        }
+        loadFile(e.dataTransfer.files[0], textarea);
       });
     }
 
