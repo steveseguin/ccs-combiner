@@ -517,7 +517,70 @@
 
 // CSS parser that handles complex structures including at-rules and basic nesting
 function parseCSS(css) {
-    css = css.replace(/\/\*[\s\S]*?\*\//g, ''); // Remove comments
+    // Hide quoted strings and escapes from the structural parser. Their punctuation
+    // is CSS data, not a declaration, selector, or block delimiter.
+    let tokenPrefix = 'CSSMERGER_LITERAL_';
+    while (css.includes(tokenPrefix)) tokenPrefix += '_';
+    const literals = [];
+    const protect = value => tokenPrefix + (literals.push(value) - 1) + '_END';
+    let protectedCss = '';
+    for (let i = 0; i < css.length;) {
+        const start = i;
+        if (css.slice(i, i + 4).toLowerCase() === 'url(' &&
+                !/^url\(\s*["']/.test(css.slice(i).toLowerCase()) &&
+                (i === 0 || !/[\w-]/.test(css[i - 1]))) {
+            // An unquoted URL can contain semicolons and comment-looking text.
+            i += 4;
+            let quote = null;
+            let closed = false;
+            while (i < css.length) {
+                const char = css[i++];
+                if (char === '\\') {
+                    if (i < css.length) i++;
+                } else if (quote) {
+                    if (char === quote) quote = null;
+                } else if (char === '"' || char === "'") {
+                    quote = char;
+                } else if (char === ')') {
+                    closed = true;
+                    break;
+                }
+            }
+            if (!closed) throw new Error('Unterminated CSS URL');
+            protectedCss += protect(css.slice(start, i));
+        } else if (css[i] === '"' || css[i] === "'") {
+            const quote = css[i++];
+            let closed = false;
+            while (i < css.length) {
+                if (css[i] === '\\') {
+                    i += Math.min(2, css.length - i);
+                } else if (css[i++] === quote) {
+                    closed = true;
+                    break;
+                }
+            }
+            if (!closed) throw new Error('Unterminated CSS string');
+            protectedCss += protect(css.slice(start, i));
+        } else if (css[i] === '\\') {
+            // Escaped delimiters are also data, including in selectors.
+            i += Math.min(2, css.length - i);
+            protectedCss += protect(css.slice(start, i));
+        } else if (css[i] === '/' && css[i + 1] === '*') {
+            const end = css.indexOf('*/', i + 2);
+            // Preserve an unmatched marker: it may belong to an escaped URL
+            // function that this small parser does not tokenize.
+            if (end < 0) {
+                protectedCss += css[i++];
+            } else {
+                i = end + 2;
+            }
+        } else {
+            protectedCss += css[i++];
+        }
+    }
+    css = protectedCss;
+    const literalPattern = new RegExp(tokenPrefix + '(\\d+)_END', 'g');
+    const restore = value => value.replace(literalPattern, (_, index) => literals[Number(index)]);
 
     const parsed = {
         rules: {}, // selector -> { declarations: {}, children: [] }
@@ -586,8 +649,24 @@ function parseCSS(css) {
                         // Clean up malformed selectors
                         selectorBuffer = selectorBuffer.replace(/:\s+/g, ':'); // Fix "a: hover" to "a:hover"
                         
-                        const selectors = selectorBuffer.split(',').map(s => s.trim()).filter(s => s && !s.endsWith(';'));
+                        // Only top-level commas separate selectors. Functional pseudo-classes
+                        // such as :is(), :not(), and :has() contain their own lists.
+                        const selectorParts = [];
+                        let selectorStart = 0;
+                        let parenthesisDepth = 0;
+                        for (let j = 0; j < selectorBuffer.length; j++) {
+                            const character = selectorBuffer[j];
+                            if (character === '(') parenthesisDepth++;
+                            else if (character === ')') parenthesisDepth--;
+                            else if (character === ',' && parenthesisDepth === 0) {
+                                selectorParts.push(selectorBuffer.slice(selectorStart, j));
+                                selectorStart = j + 1;
+                            }
+                        }
+                        selectorParts.push(selectorBuffer.slice(selectorStart));
+                        const selectors = selectorParts.map(s => s.trim()).filter(s => s && !s.endsWith(';'));
                         selectors.forEach(sel => {
+                            sel = restore(sel);
                             if (!parsed.rules[sel]) {
                                 parsed.rules[sel] = { declarations: {}, children: [] };
                             }
@@ -605,6 +684,20 @@ function parseCSS(css) {
         }
     }
 
+    // Restore only after all delimiter-sensitive parsing has finished.
+    const restoredRules = {};
+    for (const [selector, rule] of Object.entries(parsed.rules)) {
+        const declarations = {};
+        for (const [property, value] of Object.entries(rule.declarations)) {
+            declarations[restore(property)] = restore(value);
+        }
+        restoredRules[restore(selector)] = {
+            declarations,
+            children: rule.children.map(restore)
+        };
+    }
+    parsed.rules = restoredRules;
+    parsed.atRules = parsed.atRules.map(restore);
     return parsed;
 }
 
@@ -938,3 +1031,5 @@ function parseCSS(css) {
   </script>
 </body>
 </html>
+
+
